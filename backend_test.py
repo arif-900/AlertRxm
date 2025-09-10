@@ -126,6 +126,7 @@ class AlertRxAPITester:
         
         response = self.make_request('POST', 'auth/login', login_data)
         wrong_password = response and response.status_code == 401
+        print(f"    Wrong password test: {'✅' if wrong_password else '❌'} Status: {response.status_code if response else 'No response'}")
         
         # Test wrong email
         login_data = {
@@ -135,6 +136,7 @@ class AlertRxAPITester:
         
         response = self.make_request('POST', 'auth/login', login_data)
         wrong_email = response and response.status_code == 401
+        print(f"    Wrong email test: {'✅' if wrong_email else '❌'} Status: {response.status_code if response else 'No response'}")
         
         return self.log_test("Invalid Login Credentials", 
                            wrong_password and wrong_email,
