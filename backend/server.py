@@ -171,13 +171,13 @@ def assess_symptom_risk(symptoms: Dict[str, Any], custom_symptoms: Optional[str]
         if sys_bp > 180 or sys_bp < 90:
             risk_score += 3
         elif sys_bp > 140:
-            risk_score += 2
+            risk_score += 1  # Changed from 2 to 1 for better medium risk classification
     
     # Check pain level
     if 'pain_level' in symptoms:
         pain = int(symptoms.get('pain_level', 0))
         if pain >= 8:
-            risk_score += 2
+            risk_score += 3  # Changed from 2 to 3 for high risk pain
         elif pain >= 6:
             risk_score += 1
     
@@ -198,8 +198,8 @@ def assess_symptom_risk(symptoms: Dict[str, Any], custom_symptoms: Optional[str]
                 risk_score += 3
                 break
     
-    # Determine severity
-    if risk_score >= 6:
+    # Determine severity with better thresholds
+    if risk_score >= 7:  # Increased threshold for high risk
         return "high"
     elif risk_score >= 3:
         return "medium"
