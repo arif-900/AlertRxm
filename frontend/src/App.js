@@ -31,7 +31,7 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Audio alert function using tornado warning siren sound
+// Audio alert function using classic siren sound
 const playAudioAlert = (severity, symptomSummary) => {
   // Check if Web Audio API is supported
   if (!window.AudioContext && !window.webkitAudioContext) {
@@ -42,95 +42,81 @@ const playAudioAlert = (severity, symptomSummary) => {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContext();
 
-  const playTornadoWarning = (duration, volume = 0.6) => {
-    // Create main oscillator for the siren tone
+  const playSirenAlert = (duration, volume = 0.6) => {
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
     
-    // Create LFO (Low Frequency Oscillator) for the warbling effect
-    const lfo = audioContext.createOscillator();
-    const lfoGain = audioContext.createGain();
-    
-    // Create second oscillator for harmonic richness
-    const oscillator2 = audioContext.createOscillator();
-    const gainNode2 = audioContext.createGain();
-    
-    // Connect LFO to main oscillator frequency for warbling effect
-    lfo.connect(lfoGain);
-    lfoGain.connect(oscillator.frequency);
-    
-    // Connect oscillators to gain nodes and audio destination
+    // Connect oscillator to gain node to destination
     oscillator.connect(gainNode);
-    oscillator2.connect(gainNode2);
     gainNode.connect(audioContext.destination);
-    gainNode2.connect(audioContext.destination);
     
-    // Set frequencies - tornado siren characteristics
-    const baseFreq = 300; // Deep, penetrating frequency
-    const harmonicFreq = 450; // Harmonic for richness
+    // Siren characteristics
+    const lowFreq = 400;   // Low frequency of siren
+    const highFreq = 800;  // High frequency of siren
+    const cycleTime = 1.0; // Time for one complete up-down cycle
     
-    oscillator.frequency.setValueAtTime(baseFreq, audioContext.currentTime);
-    oscillator2.frequency.setValueAtTime(harmonicFreq, audioContext.currentTime);
+    oscillator.type = 'sawtooth'; // Sawtooth wave for classic siren sound
     
-    // LFO settings for warbling effect (classic tornado siren sound)
-    lfo.frequency.setValueAtTime(4, audioContext.currentTime); // 4 Hz warble
-    lfoGain.gain.setValueAtTime(50, audioContext.currentTime); // Modulation depth
-    
-    // Oscillator types for tornado siren character
-    oscillator.type = 'sawtooth'; // Rich harmonics for penetrating sound
-    oscillator2.type = 'square';  // Adds edge and presence
-    lfo.type = 'sine'; // Smooth warbling
-    
-    // Volume envelope - tornado warning pattern
     const currentTime = audioContext.currentTime;
     
-    // Main oscillator envelope
+    // Create the classic siren frequency sweep pattern
+    const numCycles = duration / cycleTime;
+    
+    for (let cycle = 0; cycle < numCycles; cycle++) {
+      const cycleStart = currentTime + (cycle * cycleTime);
+      const halfCycle = cycleTime / 2;
+      
+      // Ensure we don't exceed the total duration
+      const remainingTime = duration - (cycle * cycleTime);
+      const actualCycleTime = Math.min(cycleTime, remainingTime);
+      const actualHalfCycle = actualCycleTime / 2;
+      
+      if (actualCycleTime <= 0) break;
+      
+      // Rising frequency (low to high)
+      oscillator.frequency.setValueAtTime(lowFreq, cycleStart);
+      if (actualCycleTime >= halfCycle) {
+        oscillator.frequency.linearRampToValueAtTime(highFreq, cycleStart + actualHalfCycle);
+        
+        // Falling frequency (high to low) - only if we have time for full cycle
+        if (actualCycleTime >= cycleTime) {
+          oscillator.frequency.linearRampToValueAtTime(lowFreq, cycleStart + actualCycleTime);
+        }
+      } else {
+        // Partial cycle - just rise proportionally
+        const partialHigh = lowFreq + (highFreq - lowFreq) * (actualCycleTime / halfCycle);
+        oscillator.frequency.linearRampToValueAtTime(partialHigh, cycleStart + actualCycleTime);
+      }
+    }
+    
+    // Volume envelope - quick attack, sustained, quick release
     gainNode.gain.setValueAtTime(0, currentTime);
-    gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.1);
-    gainNode.gain.setValueAtTime(volume, currentTime + duration - 0.2);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + duration);
+    gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.05);
+    gainNode.gain.setValueAtTime(volume, currentTime + duration - 0.05);
+    gainNode.gain.linearRampToValueAtTime(0, currentTime + duration);
     
-    // Harmonic oscillator envelope (lower volume)
-    gainNode2.gain.setValueAtTime(0, currentTime);
-    gainNode2.gain.linearRampToValueAtTime(volume * 0.3, currentTime + 0.1);
-    gainNode2.gain.setValueAtTime(volume * 0.3, currentTime + duration - 0.2);
-    gainNode2.gain.exponentialRampToValueAtTime(0.01, currentTime + duration);
-    
-    // Start all oscillators
+    // Start and stop the oscillator
     oscillator.start(currentTime);
-    oscillator2.start(currentTime);
-    lfo.start(currentTime);
-    
-    // Stop all oscillators
     oscillator.stop(currentTime + duration);
-    oscillator2.stop(currentTime + duration);
-    lfo.stop(currentTime + duration);
-    
-    // Add frequency sweep effect during the alert
-    oscillator.frequency.linearRampToValueAtTime(baseFreq + 100, currentTime + duration * 0.5);
-    oscillator.frequency.linearRampToValueAtTime(baseFreq, currentTime + duration);
-    
-    oscillator2.frequency.linearRampToValueAtTime(harmonicFreq + 150, currentTime + duration * 0.5);
-    oscillator2.frequency.linearRampToValueAtTime(harmonicFreq, currentTime + duration);
   };
 
   // Determine duration and volume based on severity level
   switch (severity) {
     case 'high':
-      // High risk: 3 seconds tornado warning siren
-      playTornadoWarning(3.0, 0.8);
+      // High risk: 3 seconds siren alert
+      playSirenAlert(3.0, 0.8);
       break;
     case 'medium':
-      // Medium risk: 2 seconds tornado warning siren
-      playTornadoWarning(2.0, 0.7);
+      // Medium risk: 2 seconds siren alert
+      playSirenAlert(2.0, 0.7);
       break;
     case 'low':
-      // Low risk: 1 second tornado warning siren
-      playTornadoWarning(1.0, 0.6);
+      // Low risk: 1 second siren alert
+      playSirenAlert(1.0, 0.6);
       break;
     default:
-      // Default: 1 second tornado warning siren
-      playTornadoWarning(1.0, 0.6);
+      // Default: 1 second siren alert
+      playSirenAlert(1.0, 0.6);
   }
 };
 
