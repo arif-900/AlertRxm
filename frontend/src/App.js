@@ -31,7 +31,7 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Audio alert function using browser-generated continuous beep tones
+// Audio alert function using emergency-style alert tones
 const playAudioAlert = (severity, symptomSummary) => {
   // Check if Web Audio API is supported
   if (!window.AudioContext && !window.webkitAudioContext) {
@@ -42,50 +42,105 @@ const playAudioAlert = (severity, symptomSummary) => {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContext();
 
-  const playContinuousBeep = (frequency, totalDuration, beepDuration = 0.2, pauseDuration = 0.2, volume = 0.3) => {
+  const playEmergencyAlert = (totalDuration, pattern, volume = 0.4) => {
     let currentTime = audioContext.currentTime;
-    const cycleTime = beepDuration + pauseDuration;
-    const numberOfCycles = Math.floor(totalDuration / cycleTime);
+    const endTime = currentTime + totalDuration;
     
-    for (let i = 0; i < numberOfCycles; i++) {
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.setValueAtTime(frequency, currentTime);
-      oscillator.type = 'sine';
-      
-      // Smooth fade in and out for each beep
-      gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + beepDuration - 0.01);
-      gainNode.gain.linearRampToValueAtTime(0, currentTime + beepDuration);
-      
-      oscillator.start(currentTime);
-      oscillator.stop(currentTime + beepDuration);
-      
-      currentTime += cycleTime;
+    while (currentTime < endTime) {
+      pattern.forEach(({ frequency, duration, type = 'sine' }) => {
+        if (currentTime >= endTime) return;
+        
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(frequency, currentTime);
+        oscillator.type = type;
+        
+        // Quick attack, sustained, quick release for emergency effect
+        gainNode.gain.setValueAtTime(0, currentTime);
+        gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.02);
+        gainNode.gain.setValueAtTime(volume, currentTime + duration - 0.02);
+        gainNode.gain.linearRampToValueAtTime(0, currentTime + duration);
+        
+        oscillator.start(currentTime);
+        oscillator.stop(currentTime + duration);
+        
+        currentTime += duration;
+      });
     }
+  };
+
+  const playWarbleAlert = (totalDuration, baseFreq, modulationFreq, volume = 0.4) => {
+    const oscillator = audioContext.createOscillator();
+    const modulatorOsc = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const modulatorGain = audioContext.createGain();
+    
+    // Create warbling effect
+    modulatorOsc.connect(modulatorGain);
+    modulatorGain.connect(oscillator.frequency);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.setValueAtTime(baseFreq, audioContext.currentTime);
+    modulatorOsc.frequency.setValueAtTime(modulationFreq, audioContext.currentTime);
+    modulatorGain.gain.setValueAtTime(100, audioContext.currentTime); // Modulation depth
+    
+    oscillator.type = 'sawtooth'; // More harsh, emergency-like sound
+    modulatorOsc.type = 'sine';
+    
+    // Volume envelope
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(volume, audioContext.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(volume, audioContext.currentTime + totalDuration - 0.1);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + totalDuration);
+    
+    oscillator.start(audioContext.currentTime);
+    modulatorOsc.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + totalDuration);
+    modulatorOsc.stop(audioContext.currentTime + totalDuration);
   };
 
   switch (severity) {
     case 'high':
-      // High frequency, urgent continuous beeping for 5 seconds
-      playContinuousBeep(1000, 5.0, 0.2, 0.2, 0.5);
+      // High urgency: Alternating high-low siren-like pattern for 5 seconds
+      playEmergencyAlert(5.0, [
+        { frequency: 1200, duration: 0.15, type: 'sawtooth' },
+        { frequency: 800, duration: 0.15, type: 'sawtooth' },
+        { frequency: 1200, duration: 0.15, type: 'sawtooth' },
+        { frequency: 800, duration: 0.15, type: 'sawtooth' },
+        { frequency: 1400, duration: 0.1, type: 'square' },
+        { frequency: 600, duration: 0.1, type: 'square' }
+      ], 0.6);
       break;
+      
     case 'medium':
-      // Medium frequency, moderate continuous beeping for 3 seconds
-      playContinuousBeep(700, 3.0, 0.3, 0.3, 0.4);
+      // Medium urgency: Rapid beeping with warble effect for 3 seconds
+      playWarbleAlert(3.0, 850, 6, 0.5);
       break;
+      
     case 'low':
-      // Low frequency, gentle continuous beeping for 1.5 seconds
-      playContinuousBeep(400, 1.5, 0.4, 0.4, 0.3);
+      // Low urgency: Triple beep pattern for 1.5 seconds
+      playEmergencyAlert(1.5, [
+        { frequency: 600, duration: 0.2, type: 'triangle' },
+        { frequency: 0, duration: 0.1 }, // Silence
+        { frequency: 600, duration: 0.2, type: 'triangle' },
+        { frequency: 0, duration: 0.1 }, // Silence
+        { frequency: 600, duration: 0.2, type: 'triangle' },
+        { frequency: 0, duration: 0.7 } // Longer silence before repeat
+      ], 0.4);
       break;
+      
     default:
-      // Default notification beep
-      playContinuousBeep(600, 1.0, 0.2, 0.3, 0.3);
+      // Default: Simple attention beep
+      playEmergencyAlert(1.0, [
+        { frequency: 800, duration: 0.3, type: 'sine' },
+        { frequency: 0, duration: 0.2 },
+        { frequency: 800, duration: 0.3, type: 'sine' }
+      ], 0.3);
   }
 };
 
