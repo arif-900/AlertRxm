@@ -31,7 +31,7 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Audio alert function using thunder-style alert sound
+// Audio alert function using tornado warning siren sound
 const playAudioAlert = (severity, symptomSummary) => {
   // Check if Web Audio API is supported
   if (!window.AudioContext && !window.webkitAudioContext) {
@@ -42,70 +42,95 @@ const playAudioAlert = (severity, symptomSummary) => {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContext();
 
-  const playThunderAlert = (duration, volume = 0.5) => {
-    // Create thunder-like sound with rumble and crack
-    const bufferSize = audioContext.sampleRate * duration;
-    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-    const data = buffer.getChannelData(0);
-    
-    // Generate thunder sound
-    for (let i = 0; i < bufferSize; i++) {
-      const time = i / audioContext.sampleRate;
-      
-      // Thunder crack (sharp attack with white noise)
-      const crackIntensity = Math.exp(-time * 8) * (Math.random() * 2 - 1) * 0.3;
-      
-      // Deep rumble (low frequency oscillation)
-      const rumbleFreq1 = 40 + Math.sin(time * 3) * 10; // Varying low frequency
-      const rumbleFreq2 = 60 + Math.cos(time * 2.5) * 15; // Second rumble layer
-      const rumble = Math.sin(time * rumbleFreq1 * 2 * Math.PI) * 0.4 + 
-                    Math.sin(time * rumbleFreq2 * 2 * Math.PI) * 0.3;
-      
-      // Rolling thunder effect (mid frequency modulation)
-      const rollFreq = 120 + Math.sin(time * 1.5) * 30;
-      const roll = Math.sin(time * rollFreq * 2 * Math.PI) * Math.exp(-time * 2) * 0.2;
-      
-      // Atmospheric crackling (filtered noise)
-      const crackle = (Math.random() * 2 - 1) * Math.exp(-time * 5) * 0.15;
-      
-      // Envelope (thunder decay pattern)
-      const envelope = Math.exp(-time * 1.5) + Math.exp(-time * 0.5) * 0.3;
-      
-      // Combine all elements
-      data[i] = (crackIntensity + rumble + roll + crackle) * envelope;
-    }
-    
-    // Play the generated thunder sound
-    const source = audioContext.createBufferSource();
+  const playTornadoWarning = (duration, volume = 0.6) => {
+    // Create main oscillator for the siren tone
+    const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
     
-    source.buffer = buffer;
-    source.connect(gainNode);
+    // Create LFO (Low Frequency Oscillator) for the warbling effect
+    const lfo = audioContext.createOscillator();
+    const lfoGain = audioContext.createGain();
+    
+    // Create second oscillator for harmonic richness
+    const oscillator2 = audioContext.createOscillator();
+    const gainNode2 = audioContext.createGain();
+    
+    // Connect LFO to main oscillator frequency for warbling effect
+    lfo.connect(lfoGain);
+    lfoGain.connect(oscillator.frequency);
+    
+    // Connect oscillators to gain nodes and audio destination
+    oscillator.connect(gainNode);
+    oscillator2.connect(gainNode2);
     gainNode.connect(audioContext.destination);
+    gainNode2.connect(audioContext.destination);
     
-    // Volume control
-    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+    // Set frequencies - tornado siren characteristics
+    const baseFreq = 300; // Deep, penetrating frequency
+    const harmonicFreq = 450; // Harmonic for richness
     
-    source.start(audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(baseFreq, audioContext.currentTime);
+    oscillator2.frequency.setValueAtTime(harmonicFreq, audioContext.currentTime);
+    
+    // LFO settings for warbling effect (classic tornado siren sound)
+    lfo.frequency.setValueAtTime(4, audioContext.currentTime); // 4 Hz warble
+    lfoGain.gain.setValueAtTime(50, audioContext.currentTime); // Modulation depth
+    
+    // Oscillator types for tornado siren character
+    oscillator.type = 'sawtooth'; // Rich harmonics for penetrating sound
+    oscillator2.type = 'square';  // Adds edge and presence
+    lfo.type = 'sine'; // Smooth warbling
+    
+    // Volume envelope - tornado warning pattern
+    const currentTime = audioContext.currentTime;
+    
+    // Main oscillator envelope
+    gainNode.gain.setValueAtTime(0, currentTime);
+    gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.1);
+    gainNode.gain.setValueAtTime(volume, currentTime + duration - 0.2);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + duration);
+    
+    // Harmonic oscillator envelope (lower volume)
+    gainNode2.gain.setValueAtTime(0, currentTime);
+    gainNode2.gain.linearRampToValueAtTime(volume * 0.3, currentTime + 0.1);
+    gainNode2.gain.setValueAtTime(volume * 0.3, currentTime + duration - 0.2);
+    gainNode2.gain.exponentialRampToValueAtTime(0.01, currentTime + duration);
+    
+    // Start all oscillators
+    oscillator.start(currentTime);
+    oscillator2.start(currentTime);
+    lfo.start(currentTime);
+    
+    // Stop all oscillators
+    oscillator.stop(currentTime + duration);
+    oscillator2.stop(currentTime + duration);
+    lfo.stop(currentTime + duration);
+    
+    // Add frequency sweep effect during the alert
+    oscillator.frequency.linearRampToValueAtTime(baseFreq + 100, currentTime + duration * 0.5);
+    oscillator.frequency.linearRampToValueAtTime(baseFreq, currentTime + duration);
+    
+    oscillator2.frequency.linearRampToValueAtTime(harmonicFreq + 150, currentTime + duration * 0.5);
+    oscillator2.frequency.linearRampToValueAtTime(harmonicFreq, currentTime + duration);
   };
 
   // Determine duration and volume based on severity level
   switch (severity) {
     case 'high':
-      // High risk: 3 seconds thunder alert
-      playThunderAlert(3.0, 0.7);
+      // High risk: 3 seconds tornado warning siren
+      playTornadoWarning(3.0, 0.8);
       break;
     case 'medium':
-      // Medium risk: 2 seconds thunder alert
-      playThunderAlert(2.0, 0.6);
+      // Medium risk: 2 seconds tornado warning siren
+      playTornadoWarning(2.0, 0.7);
       break;
     case 'low':
-      // Low risk: 1 second thunder alert
-      playThunderAlert(1.0, 0.5);
+      // Low risk: 1 second tornado warning siren
+      playTornadoWarning(1.0, 0.6);
       break;
     default:
-      // Default: 1 second thunder alert
-      playThunderAlert(1.0, 0.5);
+      // Default: 1 second tornado warning siren
+      playTornadoWarning(1.0, 0.6);
   }
 };
 
