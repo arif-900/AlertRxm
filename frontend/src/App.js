@@ -31,7 +31,7 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Audio alert function using emergency-style continuous alert tone
+// Audio alert function using thunder-style alert sound
 const playAudioAlert = (severity, symptomSummary) => {
   // Check if Web Audio API is supported
   if (!window.AudioContext && !window.webkitAudioContext) {
@@ -42,65 +42,70 @@ const playAudioAlert = (severity, symptomSummary) => {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContext();
 
-  const playEmergencyTone = (duration, volume = 0.5) => {
-    let currentTime = audioContext.currentTime;
-    const endTime = currentTime + duration;
+  const playThunderAlert = (duration, volume = 0.5) => {
+    // Create thunder-like sound with rumble and crack
+    const bufferSize = audioContext.sampleRate * duration;
+    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
     
-    // Emergency alert pattern: alternating high-low frequency
-    const pattern = [
-      { frequency: 1000, duration: 0.3 }, // High tone
-      { frequency: 800, duration: 0.3 }   // Low tone
-    ];
-    
-    let patternIndex = 0;
-    
-    while (currentTime < endTime) {
-      const remaining = endTime - currentTime;
-      const currentPattern = pattern[patternIndex % pattern.length];
-      const actualDuration = Math.min(currentPattern.duration, remaining);
+    // Generate thunder sound
+    for (let i = 0; i < bufferSize; i++) {
+      const time = i / audioContext.sampleRate;
       
-      if (actualDuration <= 0) break;
+      // Thunder crack (sharp attack with white noise)
+      const crackIntensity = Math.exp(-time * 8) * (Math.random() * 2 - 1) * 0.3;
       
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      // Deep rumble (low frequency oscillation)
+      const rumbleFreq1 = 40 + Math.sin(time * 3) * 10; // Varying low frequency
+      const rumbleFreq2 = 60 + Math.cos(time * 2.5) * 15; // Second rumble layer
+      const rumble = Math.sin(time * rumbleFreq1 * 2 * Math.PI) * 0.4 + 
+                    Math.sin(time * rumbleFreq2 * 2 * Math.PI) * 0.3;
       
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // Rolling thunder effect (mid frequency modulation)
+      const rollFreq = 120 + Math.sin(time * 1.5) * 30;
+      const roll = Math.sin(time * rollFreq * 2 * Math.PI) * Math.exp(-time * 2) * 0.2;
       
-      oscillator.frequency.setValueAtTime(currentPattern.frequency, currentTime);
-      oscillator.type = 'square'; // Square wave for emergency alert sound
+      // Atmospheric crackling (filtered noise)
+      const crackle = (Math.random() * 2 - 1) * Math.exp(-time * 5) * 0.15;
       
-      // Sharp attack and release for emergency effect
-      gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.02);
-      gainNode.gain.setValueAtTime(volume, currentTime + actualDuration - 0.02);
-      gainNode.gain.linearRampToValueAtTime(0, currentTime + actualDuration);
+      // Envelope (thunder decay pattern)
+      const envelope = Math.exp(-time * 1.5) + Math.exp(-time * 0.5) * 0.3;
       
-      oscillator.start(currentTime);
-      oscillator.stop(currentTime + actualDuration);
-      
-      currentTime += actualDuration;
-      patternIndex++;
+      // Combine all elements
+      data[i] = (crackIntensity + rumble + roll + crackle) * envelope;
     }
+    
+    // Play the generated thunder sound
+    const source = audioContext.createBufferSource();
+    const gainNode = audioContext.createGain();
+    
+    source.buffer = buffer;
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Volume control
+    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+    
+    source.start(audioContext.currentTime);
   };
 
   // Determine duration and volume based on severity level
   switch (severity) {
     case 'high':
-      // High risk: 3 seconds continuous emergency tone
-      playEmergencyTone(3.0, 0.6);
+      // High risk: 3 seconds thunder alert
+      playThunderAlert(3.0, 0.7);
       break;
     case 'medium':
-      // Medium risk: 2 seconds continuous emergency tone
-      playEmergencyTone(2.0, 0.5);
+      // Medium risk: 2 seconds thunder alert
+      playThunderAlert(2.0, 0.6);
       break;
     case 'low':
-      // Low risk: 1 second continuous emergency tone
-      playEmergencyTone(1.0, 0.4);
+      // Low risk: 1 second thunder alert
+      playThunderAlert(1.0, 0.5);
       break;
     default:
-      // Default: 1 second emergency tone
-      playEmergencyTone(1.0, 0.4);
+      // Default: 1 second thunder alert
+      playThunderAlert(1.0, 0.5);
   }
 };
 
