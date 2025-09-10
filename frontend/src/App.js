@@ -31,7 +31,7 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Audio alert function using browser-generated beep tones
+// Audio alert function using browser-generated continuous beep tones
 const playAudioAlert = (severity, symptomSummary) => {
   // Check if Web Audio API is supported
   if (!window.AudioContext && !window.webkitAudioContext) {
@@ -42,57 +42,50 @@ const playAudioAlert = (severity, symptomSummary) => {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioContext = new AudioContext();
 
-  const playBeep = (frequency, duration, volume = 0.3) => {
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.gain.linearRampToValueAtTime(volume, audioContext.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration - 0.01);
-    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
-  };
-
-  const playSequentialBeeps = (beeps) => {
+  const playContinuousBeep = (frequency, totalDuration, beepDuration = 0.2, pauseDuration = 0.2, volume = 0.3) => {
     let currentTime = audioContext.currentTime;
-    beeps.forEach(({ frequency, duration, volume, delay = 0 }) => {
-      setTimeout(() => {
-        playBeep(frequency, duration, volume);
-      }, delay);
-    });
+    const cycleTime = beepDuration + pauseDuration;
+    const numberOfCycles = Math.floor(totalDuration / cycleTime);
+    
+    for (let i = 0; i < numberOfCycles; i++) {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(frequency, currentTime);
+      oscillator.type = 'sine';
+      
+      // Smooth fade in and out for each beep
+      gainNode.gain.setValueAtTime(0, currentTime);
+      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + beepDuration - 0.01);
+      gainNode.gain.linearRampToValueAtTime(0, currentTime + beepDuration);
+      
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + beepDuration);
+      
+      currentTime += cycleTime;
+    }
   };
 
   switch (severity) {
     case 'high':
-      // High frequency, urgent beeping pattern - 3 rapid beeps
-      playSequentialBeeps([
-        { frequency: 1000, duration: 0.2, volume: 0.5, delay: 0 },
-        { frequency: 1000, duration: 0.2, volume: 0.5, delay: 300 },
-        { frequency: 1000, duration: 0.2, volume: 0.5, delay: 600 }
-      ]);
+      // High frequency, urgent continuous beeping for 5 seconds
+      playContinuousBeep(1000, 5.0, 0.2, 0.2, 0.5);
       break;
     case 'medium':
-      // Medium frequency, attention beeping - 2 beeps
-      playSequentialBeeps([
-        { frequency: 700, duration: 0.3, volume: 0.4, delay: 0 },
-        { frequency: 700, duration: 0.3, volume: 0.4, delay: 500 }
-      ]);
+      // Medium frequency, moderate continuous beeping for 3 seconds
+      playContinuousBeep(700, 3.0, 0.3, 0.3, 0.4);
       break;
     case 'low':
-      // Low frequency, gentle single beep
-      playBeep(400, 0.5, 0.3);
+      // Low frequency, gentle continuous beeping for 1.5 seconds
+      playContinuousBeep(400, 1.5, 0.4, 0.4, 0.3);
       break;
     default:
       // Default notification beep
-      playBeep(600, 0.2, 0.3);
+      playContinuousBeep(600, 1.0, 0.2, 0.3, 0.3);
   }
 };
 
