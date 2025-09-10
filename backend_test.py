@@ -264,9 +264,11 @@ class AlertRxAPITester:
         
         for endpoint in endpoints:
             response = self.make_request('GET', endpoint, auth_required=False)
-            if not (response and response.status_code == 401):
+            status = response.status_code if response else 'No response'
+            protected = response and response.status_code in [401, 403]
+            print(f"    {endpoint}: {'✅' if protected else '❌'} Status: {status}")
+            if not protected:
                 all_protected = False
-                break
         
         return self.log_test("Unauthorized Access Protection", all_protected,
                            "- All protected endpoints require authentication")
