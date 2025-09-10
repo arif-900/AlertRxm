@@ -62,27 +62,28 @@ class AlertRxAPITester:
     def test_signup_invalid_password(self):
         """Test signup with invalid password"""
         weak_passwords = [
-            "weak",  # Too short
-            "weakpassword",  # No uppercase, number, special char
-            "WeakPassword",  # No number, special char
-            "WeakPassword123",  # No special char
+            ("weak", "Too short"),
+            ("weakpassword", "No uppercase, number, special char"),
+            ("WeakPassword", "No number, special char"),
+            ("WeakPassword123", "No special char"),
         ]
         
-        for password in weak_passwords:
+        all_rejected = True
+        for password, reason in weak_passwords:
             user_data = {
-                "email": f"weak_{datetime.now().strftime('%H%M%S')}@test.com",
+                "email": f"weak_{datetime.now().strftime('%H%M%S%f')}@test.com",
                 "full_name": "Weak Password User",
                 "password": password
             }
             
             response = self.make_request('POST', 'auth/signup', user_data)
             if response and response.status_code == 400:
-                success = True
+                print(f"    ✅ Password '{password}' rejected ({reason})")
             else:
-                success = False
-                break
+                print(f"    ❌ Password '{password}' accepted - should be rejected ({reason})")
+                all_rejected = False
         
-        return self.log_test("Signup Password Validation", success, 
+        return self.log_test("Signup Password Validation", all_rejected, 
                            "- Weak passwords properly rejected")
 
     def test_signup_valid(self):
