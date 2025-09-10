@@ -31,35 +31,68 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Audio alert function using Text-to-Speech
+// Audio alert function using browser-generated beep tones
 const playAudioAlert = (severity, symptomSummary) => {
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance();
+  // Check if Web Audio API is supported
+  if (!window.AudioContext && !window.webkitAudioContext) {
+    console.warn('Web Audio API not supported');
+    return;
+  }
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioContext = new AudioContext();
+
+  const playBeep = (frequency, duration, volume = 0.3) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
     
-    switch (severity) {
-      case 'high':
-        utterance.text = `Critical health alert detected. ${symptomSummary}. Immediate medical attention may be required.`;
-        utterance.rate = 0.9;
-        utterance.pitch = 1.2;
-        utterance.volume = 1.0;
-        break;
-      case 'medium':
-        utterance.text = `Moderate health concern detected. ${symptomSummary}. Please monitor closely.`;
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        utterance.volume = 0.8;
-        break;
-      case 'low':
-        utterance.text = `Low-level symptoms logged. ${symptomSummary}. Continue general monitoring.`;
-        utterance.rate = 1.1;
-        utterance.pitch = 0.9;
-        utterance.volume = 0.6;
-        break;
-      default:
-        utterance.text = `Symptoms have been logged successfully.`;
-    }
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
     
-    speechSynthesis.speak(utterance);
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(volume, audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration - 0.01);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+  };
+
+  const playSequentialBeeps = (beeps) => {
+    let currentTime = audioContext.currentTime;
+    beeps.forEach(({ frequency, duration, volume, delay = 0 }) => {
+      setTimeout(() => {
+        playBeep(frequency, duration, volume);
+      }, delay);
+    });
+  };
+
+  switch (severity) {
+    case 'high':
+      // High frequency, urgent beeping pattern - 3 rapid beeps
+      playSequentialBeeps([
+        { frequency: 1000, duration: 0.2, volume: 0.5, delay: 0 },
+        { frequency: 1000, duration: 0.2, volume: 0.5, delay: 300 },
+        { frequency: 1000, duration: 0.2, volume: 0.5, delay: 600 }
+      ]);
+      break;
+    case 'medium':
+      // Medium frequency, attention beeping - 2 beeps
+      playSequentialBeeps([
+        { frequency: 700, duration: 0.3, volume: 0.4, delay: 0 },
+        { frequency: 700, duration: 0.3, volume: 0.4, delay: 500 }
+      ]);
+      break;
+    case 'low':
+      // Low frequency, gentle single beep
+      playBeep(400, 0.5, 0.3);
+      break;
+    default:
+      // Default notification beep
+      playBeep(600, 0.2, 0.3);
   }
 };
 
